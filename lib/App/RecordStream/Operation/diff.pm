@@ -30,7 +30,8 @@ sub init {
   # "Pairwise" operation class.  Diff would then be a thin wrapper on that, and
   # also implementable in a custom way, e.g.:
   #
-  #   recs-pairwise -MData::Deep -e '{{diff}} = compare($a, $b)' a b
+  #   recs-pairwise [--by-line] -MData::Deep -e '{{diff}} = compare($a, $b)' a b
+  #   recs-pairwise -k joinkey ... a b
   #
   # -trs, 11 April 2014
 
@@ -62,6 +63,14 @@ sub create_stream {
       : (FILE => $file)
   );
 }
+
+# XXX TODO: do an outer join first if -k and then compare joined records
+#
+# recs-join --outer key key a.json b.json --operation '...'
+#
+# but how to know when a record is just left/right?  no operation is run, so there must be a way to tag 'em.
+#
+# The implicit join would essentially be what recs-pairwise does.
 
 sub accept_record {
   my $this   = shift;
