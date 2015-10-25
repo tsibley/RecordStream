@@ -19,6 +19,7 @@ sub init {
   my $inner            = 0;
   my $outer            = 0;
   my $operation        = "";
+  my $condition;
   my $accumulate_right = 0;
 
   my $spec = {
@@ -27,16 +28,19 @@ sub init {
     "inner"            => \$inner,
     "outer"            => \$outer,
     "operation=s"      => \$operation,
+    "condition=s"      => \$condition,
     "accumulate-right" => \$accumulate_right,
   };
 
   $this->parse_options($args, $spec);
 
-  my $inputkey = shift @$args
-    or die "You must provide inputkey\n";
+  unless ($condition) {
+    my $inputkey = shift @$args
+      or die "You must provide inputkey\n";
 
-  my $dbkey = shift @$args
-    or die "You must provide dbkey\n";
+    my $dbkey = shift @$args
+      or die "You must provide dbkey\n";
+  }
 
   my $dbfile = shift @$args
     or die "You must provide dbfile\n";
