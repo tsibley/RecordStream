@@ -15,6 +15,18 @@ use Getopt::Long;
 
 App::RecordStream::Site::bootstrap();
 
+# When our fatpacked version is evaluated under require() or do(), don't do
+# anything but let the libraries be loaded into the process.
+if (caller) {
+  if (not $FATPACKED) {
+    my ($package, $filename, $line) = caller;
+    die __FILE__, " loaded by package $package ($filename:$line), but this isn't the ",
+        "fatpacked version and so loading it is useless!\n";
+  }
+  return 1;
+}
+
+
 # This is required before GetOptions() since an initial "--" isn't passed
 # through, despite what the documentation says.
 my $initial_dashdash = (@ARGV and $ARGV[0] eq "--");
