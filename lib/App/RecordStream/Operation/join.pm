@@ -20,6 +20,7 @@ sub init {
   my $outer            = 0;
   my $operation        = "";
   my $accumulate_right = 0;
+  my $output_keys;
 
   my $spec = {
     "left"             => \$left,
@@ -27,6 +28,7 @@ sub init {
     "inner"            => \$inner,
     "outer"            => \$outer,
     "operation=s"      => \$operation,
+    "output-keys=s"    => \$output_keys,
     "accumulate-right" => \$accumulate_right,
   };
 
@@ -47,6 +49,22 @@ sub init {
   $this->{'KEEP_LEFT'}        = $left || $outer;
   $this->{'KEEP_RIGHT'}       = $right || $outer;
 
+  if ($output_keys) {
+    if ($operation) {
+      die "The options --output-keys and --operation are mutually exclusive.\n",
+          "Please use one or the other.\n";
+    }
+
+    my @output_keys = split /,/, $output_keys, 2;
+
+    die "Please supply exactly two comma-separated keys to --output-keys\n"
+      unless 2 == grep { defined and length } @output_keys;
+
+    $this->{'OUTPUT_KEYS'} = {
+      db    => $output_keys[0],
+      input => $output_keys[1],
+    };
+  }
 
   if ( $operation ) {
     $this->{'OPERATION'} = App::RecordStream::Executor->transform_code($operation);
@@ -68,6 +86,12 @@ sub create_db {
 
   while($record = $db_stream->get_record()) {
     my $value = $this->value_for_key($record, $key);
+
+    if ($this->{'OUTPUT_KEYS'}) {
+      $record = App::RecordStream::Record->new({
+        $this->{'OUTPUT_KEYS'}{'db'} => $record->as_hashref
+      });
+    }
 
     $db{$value} = [] unless ( $db{$value} );
     push @{$db{$value}}, $record;
@@ -97,7 +121,10 @@ sub accept_record {
   if(my $db_records = $db->{$value}) {
     foreach my $db_record (@$db_records) {
       if ($this->{'ACCUMULATE_RIGHT'}) {
-        if ($this->{'OPERATION'}) {
+        if ($this->{'OUTPUT_KEYS'}) {
+          $db_record->set( $this->{'OUTPUT_KEYS'}{'input'}, $record->as_hashref );
+        }
+        elsif ($this->{'OPERATION'}) {
           $this->run_expression($db_record, $record);
         }
         else {
@@ -109,7 +136,12 @@ sub accept_record {
         }
       }
       else {
-        if ($this->{'OPERATION'}) {
+        if ($this->{'OUTPUT_KEYS'}) {
+          my $output_record = App::RecordStream::Record->new(%$db_record);
+          $output_record->set( $this->{'OUTPUT_KEYS'}{'input'}, $record->as_hashref );
+          $this->push_record($output_record);
+        }
+        elsif ($this->{'OPERATION'}) {
           my $output_record = App::RecordStream::Record->new(%$db_record);
           $this->run_expression($output_record, $record);
           $this->push_record($output_record);
@@ -125,6 +157,11 @@ sub accept_record {
     }
   }
   elsif ($this->{'KEEP_RIGHT'}) {
+    if ($this->{'OUTPUT_KEYS'}) {
+      $record = App::RecordStream::Record->new({
+        $this->{'OUTPUT_KEYS'}{'input'} => $record->as_hashref
+      });
+    }
     $this->push_record($record);
   }
 
@@ -149,12 +186,11 @@ sub run_expression {
 sub stream_done {
   my $this = shift;
   if ($this->{'KEEP_LEFT'}) {
-    foreach my $db_records (values %{$this->{'DB'}}) {
-      foreach my $db_record (@$db_records) {
-        my $value = $this->value_for_key($db_record, $this->{'DB_KEY'});
-        if (!exists($this->{'KEYS_PRINTED'}->{$value})) {
-          $this->push_record($db_record);
-        }
+    foreach my $value (keys %{$this->{'DB'}}) {
+      next if exists $this->{'KEYS_PRINTED'}->{$value};
+
+      foreach my $db_record (@{ $this->{'DB'}{$value} }) {
+        $this->push_record($db_record);
       }
     }
   }
@@ -230,6 +266,7 @@ sub usage {
     ['inner', 'Do an inner join (This is the default)'],
     ['outer', 'Do an outer join'],
     ['operation', 'An perl expression to evaluate for merging two records together, in place of the default behavior of db fields overwriting input fields. See "Operation" below.'],
+    ['output-keys', '...'],
     ['accumulate-right', 'Accumulate all input records with the same key onto each db record matching that key. See "Accumulate Right" below.'],
   ];
 
