@@ -78,4 +78,11 @@ App::RecordStream::Test::OperationHelper->do_match(
   $solution,
 );
 
+# inner
+# left
+# right
+# outer
+# multiple matches
+# accumulate right
+
 done_testing;

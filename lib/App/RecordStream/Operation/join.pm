@@ -122,7 +122,12 @@ sub accept_record {
     foreach my $db_record (@$db_records) {
       if ($this->{'ACCUMULATE_RIGHT'}) {
         if ($this->{'OUTPUT_KEYS'}) {
-          $db_record->set( $this->{'OUTPUT_KEYS'}{'input'}, $record->as_hashref );
+          my $output_key = $this->{'OUTPUT_KEYS'}{'input'};
+          my $merged     = {
+            $record->as_hash,
+            %{ $db_record->{$output_key} || {} }
+          };
+          $db_record->set( $output_key, $merged );
         }
         elsif ($this->{'OPERATION'}) {
           $this->run_expression($db_record, $record);
